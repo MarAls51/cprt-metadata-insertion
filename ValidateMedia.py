@@ -12,9 +12,9 @@ video_media = "video"
 audio_media = "audio"
 uuid_db = "uuid"
 
-# extract uuid -> extracts the uuid, self explanatory. Looks into the given file and attempts to find the uuid inside the mp4dump value = 
+# extract uuid -> extracts the uuid, self-explanatory. Looks into the given file and attempts to find the uuid inside the mp4dump value = 
 # Args:
-#  dash obj, dash dictionary containing all information associated with the extracted prased mpd file
+#  dash obj, dash dictionary containing all information associated with the extracted parsed mpd file
 # quality id, the video or audio quality id
 # media type, either audio or video, whatever we are looking for.
 def extract_uuid(dash_obj, quality_id, media_type):
@@ -69,7 +69,7 @@ parser.add_argument(
     "--output",
 )
 
-# manifest_url -> arugment that accepts a manifest url, necessary to download the segments.
+# manifest_url -> argument that accepts a manifest URL, necessary to download the segments.
 # Args:
 # u or manifest_url 
 parser.add_argument(
