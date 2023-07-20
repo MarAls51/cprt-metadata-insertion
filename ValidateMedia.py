@@ -43,22 +43,25 @@ def extract_uuid(dash_obj, quality_id, media_type):
 # Args:
 # extracted_value, its the value extracted from the init.
 # uuid_to_validate, optional argument that is the uuid, not necessary
-def validate_uuid(extracted_value, uuid_to_validate):
+def validate_uuid(extracted_value, uuid_to_validate=None):
     
     print('''--------------- Validating uuid ---------------------
     ''')
 
-    uuid_reference = None
-    if(uuid_to_validate):
-        uuid_reference = uuid_to_validate
-    else:
-        uuid_reference = Database.extract_db_values(uuid_db) 
+    if(not uuid_to_validate):
+        uuid_status = Database.check_stored_uuid(extracted_value) 
+        if(uuid_status):
+            print("UUID Successfully validated through the database, UUID:", extracted_value)
+            subprocess.run(f'echo "{extracted_value}" > s3.txt', shell=True)
+        else:
+            print("The UUID has failed to validate inside of the database.")
+        return
 
-    if(extracted_value in uuid_reference):
-        print("UUID Successfully validated, UUID:", extracted_value)
+    if(extracted_value in uuid_to_validate):
+        print("UUID Successfully internally validated, UUID:", extracted_value)
         subprocess.run(f'echo "{extracted_value}" > s3.txt', shell=True)
     else:
-        print("The UUID has failed to validate.")
+        print("The UUID has failed to internally validate.")
 
 parser = argparse.ArgumentParser()
 # output -> folder that it outputs to.
@@ -83,6 +86,8 @@ args = parser.parse_args()
 # Validates a given stream, looks for the uuid inside the init of the first id.
 def main():
     
+    Database.open_db()
+
     start_time = time.time()
 
     dash_obj = {
@@ -92,7 +97,8 @@ def main():
     'manifest_root' : None,
     'manifest_output_path' : None,
     'manifest_output_nested_path' : None,
-    'bucket_path' : "testbucket-watermarking/validated_signal",
+    "bucket_path": "SOME PATH",
+    "bucket_filename":"SOME FILENAME",
     'video_qualities' : [],
     'audio_qualities' : [],
     'init_template_video' : None,
@@ -109,7 +115,6 @@ def main():
 
     dash_obj['root_folder'] = f"{root}"
     dash_obj['manifest_output_path'] = f"{root}/output_mpd.txt"
-
 
     dash_obj['manifest_path'] = url.rsplit('/', 1)[-1]
     dash_obj['manifest_root'] = url[:url.rindex('/')]
@@ -128,13 +133,15 @@ def main():
     script_directory = os.path.dirname(os.path.abspath(__file__))
     os.chdir(script_directory)
     if(extracted_uuid != None):
-        validate_uuid(extracted_uuid, dash_obj['uuid_value'])
-        MediaTransfer.insert_media_into_aws(dash_obj["root_folder"], dash_obj["bucket_path"], extracted_uuid, dash_obj["manifest_path"], dash_obj["manifest_output_nested_path"], True)
+        validate_uuid(extracted_uuid)
+        MediaTransfer.insert_media_into_aws(dash_obj, True)
     
     end_time = time.time()
     total_time_ms = int((end_time - start_time) * 1000)
 
     print("Time duration to validate:", total_time_ms," milliseconds")
+
+    Database.close_db()
 
 if __name__ == "__main__":
     main()

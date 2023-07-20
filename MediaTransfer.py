@@ -46,23 +46,20 @@ def extract_media_into_folder(manifest_root, media_file, folder_path_output, is_
 # Args:
 # file path, the path of the folder or file that is going to be moved to the s3 bucker
 # bucket path, the aws bucket path.
-def insert_media_into_aws(file_path, bucket_path, uuid, manifest_name, nested_output_path, is_validated=False):
-    
+def insert_media_into_aws(dash_obj, uuid):
+
     temp_dir = f"./temp_dir/{uuid}/"
     os.makedirs(temp_dir, exist_ok=True)
     subprocess.run(f"mkdir -p {temp_dir}", shell=True)
 
     subprocess.run(f"pwd",shell=True)
-    subprocess.run(f"cp -r {file_path}/ ./{temp_dir}", shell=True)
+    subprocess.run(f"cp -r {dash_obj['root_folder']}/ ./{temp_dir}", shell=True)
 
-    insert_media_folder = f"aws s3 sync ./temp_dir/  s3://{bucket_path}/"
+    insert_media_folder = f"aws s3 sync ./temp_dir/  s3://{dash_obj['bucket_path']}/"
     subprocess.run(insert_media_folder, shell=True)
     subprocess.run(f"rm -rf ./{temp_dir}", shell=True)
 
-    if(is_validated == False):
-        subprocess.run(f"echo 'https://d6p5bgq5sl2je.cloudfront.net/test_signal/{uuid}/{nested_output_path}' > urlG.txt", shell=True)
-    else:
-        subprocess.run(f"echo 'https://d6p5bgq5sl2je.cloudfront.net/validated_signal/{uuid}/{nested_output_path}' > UrlValidation.txt", shell=True)
+    subprocess.run(f"echo 'https://d6p5bgq5sl2je.cloudfront.net/{dash_obj['bucket_filename']}/{uuid}/{dash_obj['manifest_output_nested_path']}' > {dash_obj['bucket_filename']}.txt", shell=True)
 
 # path status -> checks if a given request is valid or not
 # Args:
@@ -79,3 +76,4 @@ def path_status(manifest_root, manifest_path, is_root):
         return False
 
     return True
+

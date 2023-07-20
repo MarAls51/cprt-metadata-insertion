@@ -30,19 +30,14 @@ def parse_mpd(dash_obj):
              ErrorHandling.error_handling_format("Unable to parse, initialization not found")
 
         init_template = init_template.group(1)
-        init_template = init_template.split(".mp4")[0] + ".mp4"
     
         segment_template = re.search(r'media="(.*?)"', desired_line)
 
         if(segment_template == None):
+            # look for mkv format
             ErrorHandling.error_handling_format("Unable to parse, media not found")
 
         segment_template = segment_template.group(1)
-        segment_template = segment_template.split(".mp4")[0] + ".mp4"
-
-        if('$Number$' not in segment_template):
-            ErrorHandling.error_handling_format("Unable to parse, incorrect media formatting")
-            exit(1)
 
         if (type == 'video'):
             dash_obj['init_template_video'] = init_template
@@ -50,8 +45,6 @@ def parse_mpd(dash_obj):
         else:
             dash_obj['init_template_audio'] = init_template
             dash_obj['segment_template_audio'] = segment_template
-
-    mpd_file_path = f"{os.getcwd()}/{dash_obj['manifest_output_path']}"
 
     start_number = re.search(r'startNumber="(.*?)"', desired_line)
     if(start_number == None):
@@ -61,6 +54,7 @@ def parse_mpd(dash_obj):
 
     dash_obj['start_number'] = start_number
 
+    mpd_file_path = f"{os.getcwd()}/{dash_obj['manifest_output_path']}"
     if("../" in init_template):
         split_template_array = init_template.split("/")
         updated_path_array = []
@@ -111,9 +105,10 @@ def handle_compact(dash_obj):
     target_text = "timescale="
     desired_line = locate_line(dash_obj['manifest_output_nested_path'], target_text)
     timescale = re.search(r'timescale="(.*?)"', desired_line)
-    timescale = int(timescale.group(1))
 
+    timescale = int(timescale.group(1))
     duration = int(duration.group(1))
+
     sec = duration / timescale
     if(sec < 1 or sec > 120):
        ErrorHandling.error_handling_format("Unable to parse fragment duration, estimated value:", sec)
@@ -153,7 +148,8 @@ def handle_non_compact(dash_obj):
                 segment_timeline_iteration += 1
             if(r_string in line and segment_timeline_iteration == 1):
                 r_value = re.search(r'r="(.*?)"', line)
-                r_count = r_count + int(r_value.group(1))
+                if(int(r_value.group(1)) > 0):
+                    r_count = r_count + int(r_value.group(1))
             
             if(s_string in line and segment_timeline_iteration == 1):
                 s_count += 1
@@ -262,16 +258,22 @@ def extract_media(dash_obj, quality_id, media_type, init_only=False):
 
     MediaTransfer.extract_media_into_folder(dash_obj['manifest_root'], init_template, init_template)
 
-
     if(init_only):
         return
     
     num = 0 
 
+    iterator = re.search(r'\$(.*?)\$', segment_template)
+    if(not iterator.group(1)):
+        ErrorHandling.error_handling_format("No iterator found")
+
+    iterator = "$" + iterator.group(1) + "$"
+
     if (dash_obj['total_segments'] != None):
         for fragment_num in range(dash_obj['start_number'], dash_obj['start_number'] + dash_obj['total_segments']):
             num += 1
-            init = segment_template.replace('$Number$', str(fragment_num))
+
+            init = segment_template.replace(iterator, str(fragment_num))
 
             print("Extracting File:", init)
             MediaTransfer.extract_media_into_folder(dash_obj['manifest_root'], init, init)
@@ -280,7 +282,7 @@ def extract_media(dash_obj, quality_id, media_type, init_only=False):
         current_fragment = dash_obj['start_number']
         while fragment_status:
             num += 1
-            init = segment_template.replace('$Number$', str(current_fragment))
+            init = segment_template.replace(iterator, str(current_fragment))
 
             print("Extracting File:", init)
             fragment_status = MediaTransfer.extract_media_into_folder(dash_obj['manifest_root'], init, init)

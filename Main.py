@@ -3,7 +3,6 @@ import os
 import subprocess
 import sys
 import uuid
-
 import Database
 import ErrorHandling
 import ExtractMedia
@@ -12,7 +11,6 @@ import ValidateMedia
 
 video_media = "video"
 audio_media = "audio"
-uuid_db = "uuid"
 
 parser = argparse.ArgumentParser()
 
@@ -33,6 +31,7 @@ args = parser.parse_args()
 
 # main, takes cli as arguments and inserts them into dash obj, also extracts the media content and then validates it.
 def main():
+    Database.open_db()
     dash_obj = {
         "manifest_path": None,
         "uuid_value": None,
@@ -40,7 +39,8 @@ def main():
         "manifest_root": None,
         "manifest_output_path": None,
         "manifest_output_nested_path": None,
-        "bucket_path": "testbucket-watermarking/test_signal",
+        "bucket_path": "SOME PATH",
+        "bucket_filename":"SOME FILENAME",
         "video_qualities": [],
         "audio_qualities": [],
         "init_template_video": None,
@@ -54,11 +54,15 @@ def main():
     root = args.output
     url = args.manifest_url
 
-    uuid_value = str(uuid.uuid4())
+    not_unique = True
+    uuid_value = None
+
+    while(not_unique == True):
+        uuid_value = str(uuid.uuid4())
+        not_unique = Database.check_stored_uuid(uuid_value)
+
     dash_obj["uuid_value"] = uuid_value
-
-    Database.insert_db_value(uuid_value, uuid_db)
-
+    
     if not root or not url:
         ErrorHandling.error_handling_format("Invalid args")
 
@@ -98,23 +102,27 @@ def main():
 
     script_directory = os.path.dirname(os.path.abspath(__file__))
     os.chdir(script_directory)
-    ValidateMedia.validate_uuid(extracted_value, uuid_value)
+
+
+    Database.insert_uuid_value(
+        uuid_value,
+        dash_obj
+        )
+
+    ValidateMedia.validate_uuid(extracted_value)
 
     print(
         "Total elapsed time duration to apply UUID:",
         dash_obj["cprt_time_complexity"],
         "milliseconds",
     )
+    
+    Database.close_db()
 
     MediaTransfer.insert_media_into_aws(
-        dash_obj["root_folder"],
-        dash_obj["bucket_path"],
+        dash_obj,
         uuid_value,
-        dash_obj["manifest_path"],
-        dash_obj["manifest_output_nested_path"],
-        False,
     )
-
 
 if __name__ == "__main__":
     main()
