@@ -7,7 +7,7 @@ import time
 import shutil
 import ErrorHandling
 
-# parse mpd -> We parse the mpd and assign all the parsed data to the dash_obj, it's pass by reference so we don't need to return anything.
+# parse mpd -> We parse the mpd and assign all the parsed data to the dash_obj, it's pass-by reference so we don't need to return anything.
 # Args:
 # dash_obj, contains all the information about the parsed mpd
 def parse_mpd(dash_obj):
@@ -83,9 +83,9 @@ def parse_mpd(dash_obj):
         get_media_representations(dash_obj, False)
         handle_non_compact(dash_obj)
 
-# handle_compact -> handles a compact manifest where the representation is started as a varaiable.
+# handle_compact -> handles a compact manifest where the representation is started as a variable.
 # Args:
-# dash_obj, dictioanry containing all the parsed mpd information
+# dash_obj, dictionary containing all the parsed MPD information
 def handle_compact(dash_obj):
 
     target_text = "MPD"
