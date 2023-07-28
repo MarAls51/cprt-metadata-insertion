@@ -12,18 +12,22 @@ video_media = "video"
 audio_media = "audio"
 uuid_db = "uuid"
 
-# extract uuid -> extracts the uuid, self-explanatory. Looks into the given file and attempts to find the uuid inside the mp4dump value = 
+# extract uuid -> extracts the uuid, self explanatory. Looks into the given file and attempts to find the uuid inside the mp4dump value = 
 # Args:
-#  dash obj, dash dictionary containing all information associated with the extracted parsed mpd file
+#  dash obj, dash dictionary containing all information associated with the extracted prased mpd file
 # quality id, the video or audio quality id
 # media type, either audio or video, whatever we are looking for.
 def extract_uuid(dash_obj, quality_id, media_type):
     print('''--------------- Extracting uuid ---------------------
     ''')
-    if(media_type == "video"):
-        init_template = dash_obj["init_template_video"].replace('$RepresentationID$', str(quality_id))
-    else:  
-        init_template = dash_obj["init_template_audio"].replace('$RepresentationID$', str(quality_id))
+    init_template = None
+    if(dash_obj["edge_case_base_url"]):
+        init_template = quality_id
+    else:
+        if(media_type == "video"):
+            init_template = dash_obj["init_template_video"].replace('$RepresentationID$', str(quality_id))
+        else:  
+            init_template = dash_obj["init_template_audio"].replace('$RepresentationID$', str(quality_id))
 
     dump_mp4 = f"mp4dump {init_template}"
 
@@ -72,7 +76,7 @@ parser.add_argument(
     "--output",
 )
 
-# manifest_url -> argument that accepts a manifest URL, necessary to download the segments.
+# manifest_url -> arugment that accepts a manifest url, necessary to download the segments.
 # Args:
 # u or manifest_url 
 parser.add_argument(
@@ -97,15 +101,23 @@ def main():
     'manifest_root' : None,
     'manifest_output_path' : None,
     'manifest_output_nested_path' : None,
-    "bucket_path": "SOME PATH",
-    "bucket_filename":"SOME FILENAME",
-    'video_qualities' : [],
-    'audio_qualities' : [],
-    'init_template_video' : None,
-    'segment_template_video' : None,
-    'init_template_audio' : None,
-    'segment_template_audio' : None,
-    'total_segments' : None }
+    'bucket_filename':"validated_signal",
+    'bucket_path' : "testbucket-watermarking/validated_signal",
+    "video_qualities": [],
+    "audio_qualities": [],
+    'video_time_segments': None,
+    'audio_time_segments': None,
+    "init_template_video": "",
+    "segment_template_video": "",
+    "start_number": None,
+    "init_template_audio": "",
+    "segment_template_audio": "",
+    "edge_case_video_base_root": "",
+    "edge_case_audio_base_root": "",
+    "total_segments": None,
+    "edge_case_base_url": False,
+    "base_urls": [],
+    "cprt_time_complexity": 0 }
     
     root = args.output
     url = args.manifest_url
@@ -123,12 +135,18 @@ def main():
 
     MediaTransfer.extract_media_into_folder(dash_obj["manifest_root"], dash_obj["manifest_path"], dash_obj["manifest_output_path"], True)
     
-    ExtractMedia.parse_mpd(dash_obj) 
+    ExtractMedia.parse_mpd(dash_obj)
 
-    os.chdir(os.path.dirname(dash_obj['manifest_output_nested_path']))
-    
-    ExtractMedia.extract_media(dash_obj, dash_obj["video_qualities"][0], video_media, True)
-    extracted_uuid = extract_uuid(dash_obj, dash_obj["video_qualities"][0], video_media)
+    extracted_uuid = None
+
+    if(not dash_obj["edge_case_base_url"]):
+        os.chdir(os.path.dirname(dash_obj['manifest_output_nested_path']))
+        
+        ExtractMedia.extract_media(dash_obj, dash_obj["video_qualities"][0], video_media, True)
+
+        extracted_uuid = extract_uuid(dash_obj, dash_obj["video_qualities"][0], video_media)
+    else:
+        extracted_uuid = extract_uuid(dash_obj, dash_obj["base_urls"][0], video_media)
 
     script_directory = os.path.dirname(os.path.abspath(__file__))
     os.chdir(script_directory)
