@@ -1,95 +1,84 @@
+import argparse
+import os
+import Database
+import ExtractSegmentMedia
 import MediaTransfer
-import ErrorHandling
-import re
-# extract media -> extracts the parsed media content be it the init or the segements or both.
-# Args:
-# dash_obj, contains all the information about the parsed mpd
-# quality od, the id of what we are trying to extract
-# media_type, audio or video
-# init_only, optional value, true if we only want to extract the init false if we want the segments aswell.
-def extract_media_segments(dash_obj, quality_id, media_type, init_only=False):
+import ValidateMedia
+import Mp4ContainerManip
+import ParseMpd
 
-    if(dash_obj["edge_case_base_url"]):
-        print("Extracting File:", quality_id)
-        MediaTransfer.extract_media_into_folder(dash_obj['manifest_root'], quality_id, quality_id)
-        return
+video_media = "video"
+audio_media = "audio"
 
-    init_template=""
-    segment_template=""
-    if(media_type == "video"):
-        init_template = dash_obj["edge_case_video_base_root"] + dash_obj["init_template_video"].replace('$RepresentationID$', str(quality_id))
-        segment_template = dash_obj["edge_case_video_base_root"] + dash_obj["segment_template_video"].replace('$RepresentationID$', str(quality_id))
+parser = argparse.ArgumentParser()
+
+# output -> folder that it outputs to.
+# Args: o, output
+parser.add_argument("-o", "--output")
+
+# manifest_url -> argument that accepts a manifest url, necessary to download the segments.
+# Args: m, manifest_url
+parser.add_argument("-u", "--manifest_url")
+
+args = parser.parse_args()
+
+# main, takes cli as arguments and inserts them into dash obj, also extracts the media content and then validates it.
+def main():
+    Database.open_db()
+
+    root = args.output
+    url = args.manifest_url
+    extracted_value = None
+
+    dash_obj = ParseMpd.parse_mpd(root, url, True)
+
+    if(not dash_obj["edge_case_base_url"]):
+        os.chdir(os.path.dirname(dash_obj["manifest_output_nested_path"]))
+
+        for vid_quality_id in dash_obj["video_qualities"]:
+            print(f"video_id: {vid_quality_id}")
+            ExtractSegmentMedia.extract_media_segments(dash_obj, vid_quality_id, video_media, False, True)
+
+        for aud_quality_id in dash_obj["audio_qualities"]:
+            print(f"audio_id: {aud_quality_id}")
+            ExtractSegmentMedia.extract_media_segments(dash_obj, aud_quality_id, audio_media, False, True)
+
+        extracted_value = Mp4ContainerManip.extract_uuid(
+            dash_obj, dash_obj["video_qualities"][0], video_media
+        )
     else:
-        init_template = dash_obj["edge_case_audio_base_root"] + dash_obj["init_template_audio"].replace('$RepresentationID$', str(quality_id))
-        segment_template = dash_obj["edge_case_audio_base_root"] +  dash_obj["segment_template_audio"].replace('$RepresentationID$', str(quality_id))
+        os.chdir(os.path.dirname(dash_obj["manifest_output_path"]))
+        for id in dash_obj["base_urls"]:
+            ExtractSegmentMedia.extract_media_segments(dash_obj, id, video_media)
+            Mp4ContainerManip.apply_uuid(dash_obj, id, video_media)
+        
+        extracted_value =  Mp4ContainerManip.extract_uuid(
+            dash_obj, dash_obj["base_urls"][0], video_media
+        )
 
-    print("Extracting File:", init_template)
-    MediaTransfer.extract_media_into_folder(dash_obj['manifest_root'], init_template, init_template)
-
-    if(init_only):
-        return
+    script_directory = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(script_directory)
     
-    iterator = re.search(r'\$(.*?)\$', segment_template)
-    if(not iterator.group(1)):
-        ErrorHandling.error_handling_format("No iterator found")
-    iterator = iterator.group(1)
-
-    # true for number false for time, so u don't get confused manuel.
-    iterator_type = None
-    if("Number" in iterator):
-        iterator_type = True
-    if("Time" in iterator):
-        iterator_type = False
-
-    edge_case_iterator = False
-
-    if("%0" in iterator):
-        counter_edge_case = re.search(r'%(.*?)d', iterator)
-        iterator = "%" + counter_edge_case.group(1) + "d"
-        edge_case_iterator = True
-        if(iterator_type):
-            segment_template = segment_template.replace("Number", "")
-        if(iterator_type == False):
-            segment_template = segment_template.replace("Time", "")
-
-    segment_template = segment_template.replace("$", "")
-
-    num = 0 
+    Database.insert_uuid_value(
+       dash_obj
+       )
     
-    if(iterator_type == False):
+    uuid_status = Database.check_stored_uuid(extracted_value) 
 
-        time_array = []
-        if(media_type == "video"):
-            time_array  = dash_obj['video_time_segments']
-        else:
-            time_array = dash_obj['audio_time_segments']
+    ValidateMedia.validate_uuid(extracted_value,uuid_status)
 
-        for time_value in time_array:
-            if(edge_case_iterator):
-                temp_iterator = iterator % time_value
-                segment = segment_template.replace(iterator, temp_iterator)
-            else:
-                segment = segment_template.replace(iterator, str(time_value))
+    print(
+      "Total elapsed time duration to apply UUID:",
+      dash_obj["cprt_time_complexity"],
+       "milliseconds",
+    )
+    
+    Database.close_db()
 
-            print("Extracting File:", segment)
-            MediaTransfer.extract_media_into_folder(dash_obj['manifest_root'], segment, segment)
-    elif (dash_obj['total_segments'] != None and iterator_type):
-        for fragment_num in range(dash_obj['start_number'], dash_obj['start_number'] + dash_obj['total_segments']):
-            num += 1
-            if(edge_case_iterator):
-                temp_iterator = iterator % fragment_num
-                segment = segment_template.replace(iterator, temp_iterator)
-            else:
-                segment = segment_template.replace(iterator, str(fragment_num))
-            print("Extracting File:", segment)
-            MediaTransfer.extract_media_into_folder(dash_obj['manifest_root'], segment, segment)
-    else:
-        fragment_status = True
-        current_fragment = dash_obj['start_number']
-        while fragment_status:
-            num += 1
-            init = segment_template.replace(iterator, str(current_fragment))
+    MediaTransfer.insert_media_into_aws(
+       dash_obj,
+    )
 
-            print("Extracting File:", init)
-            fragment_status = MediaTransfer.extract_media_into_folder(dash_obj['manifest_root'], init, init)
-            current_fragment = current_fragment + 1
+if __name__ == "__main__":
+    main()
+
