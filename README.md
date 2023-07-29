@@ -1,2 +1,2 @@
-![diagram1](https://github.com/MarAls51/cprt-metadata-insertion/assets/74230641/5218feb4-b62e-4189-99dd-d5ecdef225a4)
-![diagram2](https://github.com/MarAls51/cprt-metadata-insertion/assets/74230641/6d363d88-a838-46e2-afad-dc60570a1aec)
+![diagram2](https://github.com/MarAls51/cprt-metadata-insertion/assets/74230641/d3d06e13-a434-4e0e-acfa-04313cf95b11)
+![diagram1](https://github.com/MarAls51/cprt-metadata-insertion/assets/74230641/82de1de7-a9be-4459-add7-04be94997e8b)
